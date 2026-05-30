@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend-deployment
+  namespace: chatapp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backend
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      initContainers:
+      - name: wait-for-mongodb
+        image: busybox:1.36
+        command:
+        - sh
+        - -c
+        - |
+          until nslookup mongodb-service.chatapp.svc.cluster.local; do
+            echo "Waiting for MongoDB DNS..."
+            sleep 2
+          done
+          echo "MongoDB DNS is ready"
+
+      containers:
+      - name: chatapp-backend
+        image: hashimzaffar/chatapp-backend:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 5001
+        env:
+        - name: NODE_ENV
+          value: "production"
+        - name: MONGODB_URI
+          value: "mongodb://mongoadmin:hash42301@mongodb-service:27017/dbname?authSource=admin"
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: chatapp-secrets
+              key: jwt
+        - name: PORT
+          value: "5001"
